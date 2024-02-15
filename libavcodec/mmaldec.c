@@ -393,6 +393,9 @@ static av_cold int ffmmal_init_decoder(AVCodecContext *avctx)
     case AV_CODEC_ID_VC1:
         format_in->encoding = MMAL_ENCODING_WVC1;
         break;
+    case AV_CODEC_ID_MJPEG:
+	format_in->encoding = MMAL_ENCODING_MJPEG;
+	break
     case AV_CODEC_ID_H264:
     default:
         format_in->encoding = MMAL_ENCODING_H264;
@@ -709,12 +712,16 @@ static int ffmmal_read_frame(AVCodecContext *avctx, AVFrame *frame, int *got_fra
             if (!buffer)
                 goto done;
         }
-
-        ctx->eos_received |= !!(buffer->flags & MMAL_BUFFER_HEADER_FLAG_EOS);
-        if (ctx->eos_received)
+        
+	int eos = !!(buffer->flags & MMAL_BUFFER_HEADER_FLAG_EOS);
+        if (eos) {
+	    if (ctx->eos_sent) {
+	        ctx->eos_received = 1;
+            }
             goto done;
+        }	    
 
-        if (buffer->cmd == MMAL_EVENT_FORMAT_CHANGED) {
+	if (buffer->cmd == MMAL_EVENT_FORMAT_CHANGED) {
             MMAL_COMPONENT_T *decoder = ctx->decoder;
             MMAL_EVENT_FORMAT_CHANGED_T *ev = mmal_event_format_changed_get(buffer);
             MMAL_BUFFER_HEADER_T *stale_buffer;
@@ -853,6 +860,7 @@ static const AVClass ffmmal_dec_class = {
     };
 
 FFMMAL_DEC(h264, AV_CODEC_ID_H264)
+FFMMAL_DEC(mjpeg, AC_CODEC_ID_MJPEG)
 FFMMAL_DEC(mpeg2, AV_CODEC_ID_MPEG2VIDEO)
 FFMMAL_DEC(mpeg4, AV_CODEC_ID_MPEG4)
 FFMMAL_DEC(vc1, AV_CODEC_ID_VC1)
